@@ -1,0 +1,4 @@
+- name: 'Restart Server'
+  service:
+    name: 'server'
+    state: 'restarted'

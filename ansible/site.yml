@@ -1,9 +1,12 @@
-- hosts: worker
-  become: true
+---
+- hosts: 'asysup-server'
+  become: True
+  become_method: 'sudo'
   roles:
-    - worker
+    - { role: 'asysup-server' }
 
-- hosts: server
-  become: true
+- hosts: 'asysup-worker'
+  become: True
+  become_method: 'sudo'
   roles:
-      - server
+    - { role: 'asysup-worker' }

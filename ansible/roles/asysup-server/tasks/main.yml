@@ -1,0 +1,83 @@
+---
+- name: 'Include OS Variables'
+  include_vars: '{{ item }}'
+  with_first_found:
+    - files:
+      - '{{ ansible_distribution }}.yml'
+      - '{{ ansible_os_family }}.yml'
+      skip: True
+
+- name: 'Install Packages'
+  package:
+    name: '{{ item }}'
+    state: 'present'
+  with_items: '{{ asysup_server_pkg }}'
+
+- name: 'Ensure Server User'
+  user:
+    name: '{{ server_user }}'
+
+- name: 'Clone Repository'
+  git:
+    repo: 'https://github.com/aparcar/gsoc17-attended-sysupgrade.git'
+    version: '{{ asysup_commit }}'
+    dest: '{{ server_folder }}'
+    update: '{{ force_update }}'
+  notify:
+    - 'Restart Server'
+
+- name: 'Ensure Database'
+  become: True
+  become_method: 'sudo'
+  become_user: 'postgres'
+  postgresql_db:
+    name: '{{ database_name }}'
+
+- name: 'Ensure Database Access'
+  become: True
+  become_method: 'sudo'
+  become_user: 'postgres'
+  postgresql_user:
+    db: '{{ database_name }}'
+    name: '{{ database_user }}'
+    password: '{{ database_pass }}'
+    priv: 'ALL'
+
+- name: 'Ensure User Priveleges'
+  become: True
+  become_method: 'sudo'
+  become_user: 'postgres'
+  postgresql_user:
+    name: '{{ database_user }}'
+    role_attr_flags: 'NOSUPERUSER,NOCREATEDB'
+
+- name: 'Template nginx Configuration'
+  template:
+    src: 'server.conf.j2'
+    dest: '/etc/nginx/sites-enabled/server.conf'
+
+- name: 'Template Service'
+  template:
+    src: 'server.service.j2'
+    dest: '/etc/systemd/system/server.service'
+
+- name: 'Template Configuration'
+  template:
+    src: 'config.yml.j2'
+    dest: '{{ server_folder }}/config.yml'
+
+- name: 'Ensure Server Service Started/Enabled'
+  service:
+    name: 'server'
+    state: 'started'
+    enabled: True
+
+# download all releases and init all current imagebuilders
+- name: 'Initialize Server'
+  become: True
+  become_user: '{{ server_user }}'
+  command: 'python3 cli.py -ia'
+  args:
+    chdir: '{{ server_folder }}'
+    creates: '{{ server_folder }}/imagebuilder'
+
